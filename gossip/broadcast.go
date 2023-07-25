@@ -1,4 +1,4 @@
-package gossip_leaderelection
+package gossip
 
 import (
 	"github.com/hashicorp/memberlist"

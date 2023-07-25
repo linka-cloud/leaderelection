@@ -1,4 +1,4 @@
-package gossip_leaderelection
+package gossip
 
 import (
 	"context"
@@ -10,10 +10,10 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	le "go.linka.cloud/gossip-leaderelection/leaderelection"
+	le "go.linka.cloud/leaderelection"
 )
 
-var _ le.Interface = (*lock)(nil)
+var _ le.Lock = (*lock)(nil)
 
 type lock struct {
 	kv   KV
@@ -21,7 +21,7 @@ type lock struct {
 	id   string
 }
 
-func NewLock(kv KV, name string, id string) le.Interface {
+func NewLock(kv KV, name string, id string) le.Lock {
 	return &lock{
 		kv:   kv,
 		name: name,
@@ -29,7 +29,7 @@ func NewLock(kv KV, name string, id string) le.Interface {
 	}
 }
 
-func (l *lock) Get(ctx context.Context) (*le.LeaderElectionRecord, []byte, error) {
+func (l *lock) Get(ctx context.Context) (*le.Record, []byte, error) {
 	logrus.Tracef("lock.Get")
 	b, err := l.kv.Get(ctx, l.name)
 	if err != nil {
@@ -38,14 +38,14 @@ func (l *lock) Get(ctx context.Context) (*le.LeaderElectionRecord, []byte, error
 		}
 		return nil, nil, err
 	}
-	ler := &le.LeaderElectionRecord{}
+	ler := &le.Record{}
 	if err := json.Unmarshal(b, ler); err != nil {
 		return nil, nil, err
 	}
 	return ler, b, nil
 }
 
-func (l *lock) Create(ctx context.Context, ler le.LeaderElectionRecord) error {
+func (l *lock) Create(ctx context.Context, ler le.Record) error {
 	logrus.Tracef("lock.Create")
 	b, err := json.Marshal(ler)
 	if err != nil {
@@ -57,7 +57,7 @@ func (l *lock) Create(ctx context.Context, ler le.LeaderElectionRecord) error {
 	return nil
 }
 
-func (l *lock) Update(ctx context.Context, ler le.LeaderElectionRecord) error {
+func (l *lock) Update(ctx context.Context, ler le.Record) error {
 	logrus.Tracef("lock.Update")
 	b, err := json.Marshal(ler)
 	if err != nil {

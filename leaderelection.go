@@ -70,8 +70,8 @@ const (
 	JitterFactor = 1.2
 )
 
-// NewLeaderElector creates a LeaderElector from a LeaderElectionConfig
-func NewLeaderElector(lec LeaderElectionConfig) (*LeaderElector, error) {
+// New creates a LeaderElector from a Config
+func New(lec Config) (*LeaderElector, error) {
 	if lec.LeaseDuration <= lec.RenewDeadline {
 		return nil, fmt.Errorf("leaseDuration must be greater than renewDeadline")
 	}
@@ -106,9 +106,9 @@ func NewLeaderElector(lec LeaderElectionConfig) (*LeaderElector, error) {
 	return &le, nil
 }
 
-type LeaderElectionConfig struct {
+type Config struct {
 	// Lock is the resource that will be used for locking
-	Lock Interface
+	Lock Lock
 
 	// LeaseDuration is the duration that non-leader candidates will
 	// wait to force acquire leadership. This is measured against time of
@@ -137,7 +137,7 @@ type LeaderElectionConfig struct {
 
 	// Callbacks are callbacks that are triggered during certain lifecycle
 	// events of the LeaderElector
-	Callbacks LeaderCallbacks
+	Callbacks Callbacks
 
 	// WatchDog is the associated health checker
 	// WatchDog may be null if it's not needed/configured.
@@ -154,12 +154,12 @@ type LeaderElectionConfig struct {
 	Name string
 }
 
-// LeaderCallbacks are callbacks that are triggered during certain
+// Callbacks are callbacks that are triggered during certain
 // lifecycle events of the LeaderElector. These are invoked asynchronously.
 //
 // possible future callbacks:
 //   - OnChallenge()
-type LeaderCallbacks struct {
+type Callbacks struct {
 	// OnStartedLeading is called when a LeaderElector client starts leading
 	OnStartedLeading func(context.Context)
 	// OnStoppedLeading is called when a LeaderElector client stops leading
@@ -172,9 +172,9 @@ type LeaderCallbacks struct {
 
 // LeaderElector is a leader election client.
 type LeaderElector struct {
-	config LeaderElectionConfig
+	config Config
 	// internal bookkeeping
-	observedRecord    LeaderElectionRecord
+	observedRecord    Record
 	observedRawRecord []byte
 	observedTime      time.Time
 	// used to implement OnNewLeader(), may lag slightly from the
@@ -210,8 +210,8 @@ func (le *LeaderElector) Run(ctx context.Context) {
 // RunOrDie starts a client with the provided config or panics if the config
 // fails to validate. RunOrDie blocks until leader election loop is
 // stopped by ctx or it has stopped holding the leader lease
-func RunOrDie(ctx context.Context, lec LeaderElectionConfig) {
-	le, err := NewLeaderElector(lec)
+func RunOrDie(ctx context.Context, lec Config) {
+	le, err := New(lec)
 	if err != nil {
 		panic(err)
 	}
@@ -291,7 +291,7 @@ func (le *LeaderElector) release() bool {
 		return true
 	}
 	now := le.clock.Now()
-	leaderElectionRecord := LeaderElectionRecord{
+	leaderElectionRecord := Record{
 		LeaderTransitions:         le.observedRecord.LeaderTransitions,
 		LeaseDurationMilliSeconds: 1,
 		RenewTime:                 now.UnixMilli(),
@@ -311,7 +311,7 @@ func (le *LeaderElector) release() bool {
 // on success else returns false.
 func (le *LeaderElector) tryAcquireOrRenew(ctx context.Context) bool {
 	now := le.clock.Now()
-	leaderElectionRecord := LeaderElectionRecord{
+	leaderElectionRecord := Record{
 		HolderIdentity:            le.config.Lock.Identity(),
 		LeaseDurationMilliSeconds: int(le.config.LeaseDuration / time.Millisecond),
 		RenewTime:                 now.UnixMilli(),
@@ -362,6 +362,7 @@ func (le *LeaderElector) tryAcquireOrRenew(ctx context.Context) bool {
 		klog.Errorf("Failed to update lock: %v", err)
 		return false
 	}
+	klog.V(4).Infof("lock renewed")
 
 	le.setObservedRecord(&leaderElectionRecord)
 	return true
@@ -395,7 +396,7 @@ func (le *LeaderElector) Check(maxTolerableExpiredLease time.Duration) error {
 
 // setObservedRecord will set a new observedRecord and update observedTime to the current time.
 // Protect critical sections with lock.
-func (le *LeaderElector) setObservedRecord(observedRecord *LeaderElectionRecord) {
+func (le *LeaderElector) setObservedRecord(observedRecord *Record) {
 	le.observedRecordLock.Lock()
 	defer le.observedRecordLock.Unlock()
 
@@ -405,7 +406,7 @@ func (le *LeaderElector) setObservedRecord(observedRecord *LeaderElectionRecord)
 
 // getObservedRecord returns observersRecord.
 // Protect critical sections with lock.
-func (le *LeaderElector) getObservedRecord() LeaderElectionRecord {
+func (le *LeaderElector) getObservedRecord() Record {
 	le.observedRecordLock.Lock()
 	defer le.observedRecordLock.Unlock()
 

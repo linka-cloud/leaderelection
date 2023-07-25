@@ -1,20 +1,46 @@
-package gossip_leaderelection
+package gossip
 
 import (
 	"context"
+	"io"
 	"os"
 	"time"
 
 	"github.com/hashicorp/memberlist"
 	"github.com/sirupsen/logrus"
+
+	le "go.linka.cloud/leaderelection"
 )
+
+type GossipLock interface {
+	io.Closer
+	le.Lock
+}
+
+type gossipLock struct {
+	*lock
+	kv KV
+}
+
+func (l *gossipLock) Close() error {
+	return l.kv.Close()
+}
+
+func New(ctx context.Context, config *memberlist.Config, lockName, id string, addrs ...string) (GossipLock, error) {
+	kv, err := NewKV(ctx, config, addrs...)
+	if err != nil {
+		return nil, err
+	}
+	lock := &lock{kv: kv, name: lockName, id: id}
+	return &gossipLock{kv: kv, lock: lock}, nil
+}
 
 type gossip struct {
 	delegate *delegate
 	list     *memberlist.Memberlist
 }
 
-func NewGossip(config *memberlist.Config, addrs ...string) (KV, error) {
+func NewKV(_ context.Context, config *memberlist.Config, addrs ...string) (KV, error) {
 	if config.Logger == nil {
 		config.Logger = newLogger()
 	}
@@ -27,8 +53,12 @@ func NewGossip(config *memberlist.Config, addrs ...string) (KV, error) {
 		NumNodes:       list.NumMembers,
 	})
 	config.Delegate = d
-	if _, err = list.Join(addrs); err != nil {
+	n, err := list.Join(addrs)
+	if err != nil {
 		return nil, err
+	}
+	if n > d.queue.RetransmitMult {
+		d.queue.RetransmitMult = n
 	}
 	return &gossip{
 		delegate: d,
@@ -38,7 +68,10 @@ func NewGossip(config *memberlist.Config, addrs ...string) (KV, error) {
 
 func (g *gossip) Get(ctx context.Context, key string) ([]byte, error) {
 	logrus.WithField("key", key).Tracef("gossip.Get")
-	b, ok := g.delegate.get(key)
+	b, ok, err := g.delegate.get(ctx, key)
+	if err != nil {
+		return nil, err
+	}
 	if !ok {
 		return nil, os.ErrNotExist
 	}
@@ -47,14 +80,12 @@ func (g *gossip) Get(ctx context.Context, key string) ([]byte, error) {
 
 func (g *gossip) Set(ctx context.Context, key string, value []byte) error {
 	logrus.WithField("key", key).Tracef("gossip.Set")
-	g.delegate.set(key, value)
-	return nil
+	return g.delegate.set(ctx, key, value)
 }
 
 func (g *gossip) Delete(ctx context.Context, key string) error {
 	logrus.WithField("key", key).Tracef("gossip.Delete")
-	g.delegate.delete(key)
-	return nil
+	return g.delegate.delete(ctx, key)
 }
 
 func (g *gossip) Close() error {
