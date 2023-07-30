@@ -55,11 +55,12 @@ package leaderelection
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
+	"os"
 	"sync"
 	"time"
 
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
@@ -196,11 +197,11 @@ type LeaderElector struct {
 // stopped holding the leader lease
 func (le *LeaderElector) Run(ctx context.Context) {
 	defer runtime.HandleCrash()
-	defer le.config.Callbacks.OnStoppedLeading()
 
 	if !le.acquire(ctx) {
 		return // ctx signalled done
 	}
+	defer le.config.Callbacks.OnStoppedLeading()
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	go le.config.Callbacks.OnStartedLeading(ctx)
@@ -321,7 +322,7 @@ func (le *LeaderElector) tryAcquireOrRenew(ctx context.Context) bool {
 	// 1. obtain or create the ElectionRecord
 	oldLeaderElectionRecord, oldLeaderElectionRawRecord, err := le.config.Lock.Get(ctx)
 	if err != nil {
-		if !errors.IsNotFound(err) {
+		if !errors.Is(err, os.ErrNotExist) {
 			klog.Errorf("error retrieving resource lock %v: %v", le.config.Lock.Describe(), err)
 			return false
 		}

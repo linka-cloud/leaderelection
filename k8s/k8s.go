@@ -21,10 +21,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"time"
 
 	coordinationv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientset "k8s.io/client-go/kubernetes"
@@ -90,6 +92,9 @@ type LeaseLock struct {
 func (ll *LeaseLock) Get(ctx context.Context) (*le.Record, []byte, error) {
 	lease, err := ll.Client.Leases(ll.LeaseMeta.Namespace).Get(ctx, ll.LeaseMeta.Name, metav1.GetOptions{})
 	if err != nil {
+		if !kerrors.IsNotFound(err) {
+			return nil, nil, os.ErrNotExist
+		}
 		return nil, nil, err
 	}
 	ll.lease = lease
@@ -123,6 +128,9 @@ func (ll *LeaseLock) Update(ctx context.Context, ler le.Record) error {
 
 	lease, err := ll.Client.Leases(ll.LeaseMeta.Namespace).Update(ctx, ll.lease, metav1.UpdateOptions{})
 	if err != nil {
+		if !kerrors.IsNotFound(err) {
+			return os.ErrNotExist
+		}
 		return err
 	}
 

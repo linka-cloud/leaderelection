@@ -20,7 +20,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"strings"
 	"sync"
 
@@ -82,9 +81,6 @@ func (l *lock) Get(ctx context.Context) (*le.Record, []byte, error) {
 	}
 	f, err := w.Filesystem.Open(l.name)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, nil, apierrs.NewNotFound(schema.GroupResource{}, l.name)
-		}
 		return nil, nil, fmt.Errorf("failed to open file: %w", err)
 	}
 	defer f.Close()

@@ -18,11 +18,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 
 	"github.com/sirupsen/logrus"
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	le "go.linka.cloud/leaderelection"
 )
@@ -47,9 +44,6 @@ func (l *lock) Get(ctx context.Context) (*le.Record, []byte, error) {
 	logrus.Tracef("lock.Get")
 	b, err := l.kv.Get(ctx, l.name)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, nil, errors.NewNotFound(schema.GroupResource{}, l.name)
-		}
 		return nil, nil, err
 	}
 	ler := &le.Record{}
