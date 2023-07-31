@@ -12,7 +12,7 @@
 
 This module is extracted from the [k8s.io/client-go](https://github.com/kubernetes/client-go) package. 
 It provides a simple interface for implementing leader election in a distributed system using different backends:
-- [kubernetes](k8s): using [Lease](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#lease-v1-coordination-k8s-io) 
+- [kubernetes](k8s): using [Lease](https://kubernetes.io/docs/concepts/architecture/leases/) 
   (Kubernetes API)
 
   [![Go Reference](https://pkg.go.dev/badge/go.linka.cloud/leaderelection/k8s.svg)](https://pkg.go.dev/go.linka.cloud/leaderelection/k8s)
