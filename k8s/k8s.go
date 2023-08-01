@@ -92,7 +92,7 @@ type LeaseLock struct {
 func (ll *LeaseLock) Get(ctx context.Context) (*le.Record, []byte, error) {
 	lease, err := ll.Client.Leases(ll.LeaseMeta.Namespace).Get(ctx, ll.LeaseMeta.Name, metav1.GetOptions{})
 	if err != nil {
-		if !kerrors.IsNotFound(err) {
+		if kerrors.IsNotFound(err) {
 			return nil, nil, os.ErrNotExist
 		}
 		return nil, nil, err
@@ -128,7 +128,7 @@ func (ll *LeaseLock) Update(ctx context.Context, ler le.Record) error {
 
 	lease, err := ll.Client.Leases(ll.LeaseMeta.Namespace).Update(ctx, ll.lease, metav1.UpdateOptions{})
 	if err != nil {
-		if !kerrors.IsNotFound(err) {
+		if kerrors.IsNotFound(err) {
 			return os.ErrNotExist
 		}
 		return err
@@ -184,7 +184,10 @@ func LeaseSpecToLeaderElectionRecord(spec *coordinationv1.LeaseSpec) *le.Record 
 }
 
 func LeaderElectionRecordToLeaseSpec(ler *le.Record) coordinationv1.LeaseSpec {
-	leaseDurationSeconds := int32(ler.LeaseDurationMilliSeconds) * 1000
+	leaseDurationSeconds := int32(ler.LeaseDurationMilliSeconds) / 1000
+	if leaseDurationSeconds == 0 {
+		leaseDurationSeconds = 1
+	}
 	leaseTransitions := int32(ler.LeaderTransitions)
 	return coordinationv1.LeaseSpec{
 		HolderIdentity:       &ler.HolderIdentity,
