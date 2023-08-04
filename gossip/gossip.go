@@ -22,6 +22,7 @@ import (
 
 	"github.com/hashicorp/memberlist"
 	"github.com/sirupsen/logrus"
+	"go.uber.org/multierr"
 
 	le "go.linka.cloud/leaderelection"
 )
@@ -103,5 +104,5 @@ func (g *gossip) Delete(ctx context.Context, key string) error {
 }
 
 func (g *gossip) Close() error {
-	return g.list.Leave(time.Second)
+	return multierr.Combine(g.list.Leave(time.Second), g.list.Shutdown())
 }
