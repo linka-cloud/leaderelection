@@ -11,8 +11,9 @@ require (
 	github.com/hashicorp/memberlist v0.5.0
 	github.com/miekg/dns v1.1.50
 	github.com/pkg/errors v0.9.1
-	github.com/prometheus/client_golang v1.4.0
+	github.com/prometheus/client_golang v1.14.0
 	github.com/sirupsen/logrus v1.9.3
+	go.linka.cloud/grpc-toolkit v0.4.1-0.20230707233310-df505b58d7db
 	go.linka.cloud/leaderelection v0.0.0-00010101000000-000000000000
 	go.uber.org/multierr v1.11.0
 	golang.org/x/sys v0.10.0
@@ -22,7 +23,8 @@ require (
 require (
 	github.com/armon/go-metrics v0.3.10 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
-	github.com/cespare/xxhash/v2 v2.1.1 // indirect
+	github.com/bombsimon/logrusr/v2 v2.0.1 // indirect
+	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/go-logfmt/logfmt v0.5.1 // indirect
 	github.com/go-logr/logr v1.2.3 // indirect
@@ -35,10 +37,10 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/hashicorp/go-sockaddr v1.0.2 // indirect
 	github.com/hashicorp/golang-lru v0.5.4 // indirect
-	github.com/matttproud/golang_protobuf_extensions v1.0.1 // indirect
-	github.com/prometheus/client_model v0.2.0 // indirect
-	github.com/prometheus/common v0.9.1 // indirect
-	github.com/prometheus/procfs v0.0.8 // indirect
+	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
+	github.com/prometheus/client_model v0.3.0 // indirect
+	github.com/prometheus/common v0.42.0 // indirect
+	github.com/prometheus/procfs v0.8.0 // indirect
 	github.com/sean-/seed v0.0.0-20170313163322-e2103e2c3529 // indirect
 	golang.org/x/mod v0.9.0 // indirect
 	golang.org/x/net v0.9.0 // indirect

@@ -19,7 +19,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/sirupsen/logrus"
+	"go.linka.cloud/grpc-toolkit/logger"
 
 	le "go.linka.cloud/leaderelection"
 )
@@ -41,7 +41,7 @@ func NewLock(kv KV, name string, id string) le.Lock {
 }
 
 func (l *lock) Get(ctx context.Context) (*le.Record, []byte, error) {
-	logrus.Tracef("lock.Get")
+	logger.C(ctx).Tracef("lock.Get")
 	b, err := l.kv.Get(ctx, l.name)
 	if err != nil {
 		return nil, nil, err
@@ -54,7 +54,7 @@ func (l *lock) Get(ctx context.Context) (*le.Record, []byte, error) {
 }
 
 func (l *lock) Create(ctx context.Context, ler le.Record) error {
-	logrus.Tracef("lock.Create")
+	logger.C(ctx).Tracef("lock.Create")
 	b, err := json.Marshal(ler)
 	if err != nil {
 		return err
@@ -66,7 +66,7 @@ func (l *lock) Create(ctx context.Context, ler le.Record) error {
 }
 
 func (l *lock) Update(ctx context.Context, ler le.Record) error {
-	logrus.Tracef("lock.Update")
+	logger.C(ctx).Tracef("lock.Update")
 	b, err := json.Marshal(ler)
 	if err != nil {
 		return err
@@ -77,9 +77,7 @@ func (l *lock) Update(ctx context.Context, ler le.Record) error {
 	return nil
 }
 
-func (l *lock) RecordEvent(s string) {
-	logrus.Infof("record event: %s", s)
-}
+func (l *lock) RecordEvent(_ string) {}
 
 func (l *lock) Identity() string {
 	return l.id

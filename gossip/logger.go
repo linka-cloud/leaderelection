@@ -16,19 +16,21 @@ package gossip
 
 import (
 	"bytes"
+	"context"
 	"log"
 
 	"github.com/bombsimon/logrusr/v4"
 	"github.com/sirupsen/logrus"
+	"go.linka.cloud/grpc-toolkit/logger"
 	"k8s.io/klog/v2"
 )
 
-func newLogger() *log.Logger {
-	return log.New(&logw{logger: logrus.StandardLogger()}, "", 0)
+func newLogger(ctx context.Context) *log.Logger {
+	return log.New(&logw{logger: logger.C(ctx)}, "", 0)
 }
 
 type logw struct {
-	logger logrus.FieldLogger
+	logger logger.Logger
 }
 
 func (l *logw) Write(b []byte) (int, error) {

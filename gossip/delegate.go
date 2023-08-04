@@ -21,7 +21,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/memberlist"
-	"github.com/sirupsen/logrus"
+	"go.linka.cloud/grpc-toolkit/logger"
 )
 
 var _ memberlist.Delegate = (*delegate)(nil)
@@ -30,12 +30,14 @@ type delegate struct {
 	queue *memberlist.TransmitLimitedQueue
 	kmu   sync.RWMutex
 	kv    map[string]*kv
+	log   logger.Logger
 }
 
-func newDelegate(queue *memberlist.TransmitLimitedQueue) *delegate {
+func newDelegate(ctx context.Context, queue *memberlist.TransmitLimitedQueue) *delegate {
 	return &delegate{
 		queue: queue,
 		kv:    make(map[string]*kv),
+		log:   logger.C(ctx),
 	}
 }
 
@@ -44,7 +46,7 @@ func (d *delegate) NodeMeta(_ int) []byte {
 }
 
 func (d *delegate) NotifyMsg(b []byte) {
-	log := logrus.WithField("method", "delegate.NotifyMsg")
+	log := d.log.WithField("method", "delegate.NotifyMsg")
 
 	a := &action{}
 	if err := a.Decode(b); err != nil {
@@ -80,17 +82,14 @@ func (d *delegate) NotifyMsg(b []byte) {
 }
 
 func (d *delegate) GetBroadcasts(overhead, limit int) [][]byte {
-	log := logrus.
-		WithField("method", "delegate.GetBroadcasts").
-		WithField("overhead", overhead).
-		WithField("limit", limit)
+	log := d.log.WithFields("method", "delegate.GetBroadcasts", "overhead", overhead, "limit", limit)
 	out := d.queue.GetBroadcasts(overhead, limit)
 	log.Tracef("length: %d", len(out))
 	return out
 }
 
 func (d *delegate) LocalState(join bool) []byte {
-	log := logrus.WithField("method", "delegate.LocalState").WithFields(logrus.Fields{"join": join})
+	log := d.log.WithFields("method", "delegate.LocalState", "join", join)
 	log.Trace()
 	d.kmu.RLock()
 	defer d.kmu.RUnlock()
@@ -102,7 +101,7 @@ func (d *delegate) LocalState(join bool) []byte {
 }
 
 func (d *delegate) MergeRemoteState(buf []byte, join bool) {
-	log := logrus.WithField("method", "delegate.MergeRemoteState").WithFields(logrus.Fields{"join": join})
+	log := d.log.WithFields("method", "delegate.MergeRemoteState", "join", join)
 	d.kmu.Lock()
 	defer d.kmu.Unlock()
 	for len(buf) > 0 {
@@ -134,7 +133,7 @@ func (d *delegate) MergeRemoteState(buf []byte, join bool) {
 }
 
 func (d *delegate) get(ctx context.Context, key string) ([]byte, bool, error) {
-	log := logrus.WithField("method", "delegate.get").WithFields(logrus.Fields{"key": key})
+	log := logger.C(ctx).WithFields("method", "delegate.get", "key", key)
 	log.Trace()
 	d.kmu.RLock()
 	b, ok := d.kv[key]
@@ -151,7 +150,7 @@ func (d *delegate) get(ctx context.Context, key string) ([]byte, bool, error) {
 }
 
 func (d *delegate) set(ctx context.Context, key string, value []byte) error {
-	log := logrus.WithField("method", "delegate.get").WithFields(logrus.Fields{"key": key})
+	log := logger.C(ctx).WithFields("method", "delegate.get", "key", key)
 	d.kmu.Lock()
 	if kv, ok := d.kv[key]; ok && bytes.Equal(kv.value, value) {
 		defer d.kmu.Unlock()

@@ -21,10 +21,11 @@ import (
 	"time"
 
 	"github.com/hashicorp/memberlist"
-	"github.com/sirupsen/logrus"
+	"go.linka.cloud/grpc-toolkit/logger"
 	"go.uber.org/multierr"
 
 	le "go.linka.cloud/leaderelection"
+	"go.linka.cloud/leaderelection/gossip/internal/dns"
 )
 
 type GossipLock interface {
@@ -41,8 +42,8 @@ func (l *gossipLock) Close() error {
 	return l.kv.Close()
 }
 
-func New(ctx context.Context, config *memberlist.Config, lockName, id string, addrs ...string) (GossipLock, error) {
-	kv, err := NewKV(ctx, config, addrs...)
+func New(ctx context.Context, config *memberlist.Config, lockName, id string, meta []byte, addrs ...string) (GossipLock, error) {
+	kv, err := NewKV(ctx, config, meta, addrs...)
 	if err != nil {
 		return nil, err
 	}
@@ -55,15 +56,24 @@ type gossip struct {
 	list     *memberlist.Memberlist
 }
 
-func NewKV(_ context.Context, config *memberlist.Config, addrs ...string) (KV, error) {
+func NewKV(ctx context.Context, config *memberlist.Config, meta []byte, addrs ...string) (KV, error) {
 	if config.Logger == nil {
-		config.Logger = newLogger()
+		config.Logger = newLogger(ctx)
+	}
+	p := dns.NewProvider(ctx, dns.MiekgdnsResolverType)
+	if err := p.Resolve(ctx, addrs); err != nil {
+		return nil, err
+	}
+	addrs = p.Addresses()
+	if config.RetransmitMult < len(addrs) {
+		config.RetransmitMult = len(addrs)
 	}
 	list, err := memberlist.Create(config)
 	if err != nil {
 		return nil, err
 	}
-	d := newDelegate(&memberlist.TransmitLimitedQueue{
+	list.LocalNode().Meta = meta
+	d := newDelegate(ctx, &memberlist.TransmitLimitedQueue{
 		RetransmitMult: config.RetransmitMult,
 		NumNodes:       list.NumMembers,
 	})
@@ -72,7 +82,7 @@ func NewKV(_ context.Context, config *memberlist.Config, addrs ...string) (KV, e
 	if err != nil {
 		return nil, err
 	}
-	if n > d.queue.RetransmitMult {
+	if d.queue.RetransmitMult < n {
 		d.queue.RetransmitMult = n
 	}
 	return &gossip{
@@ -82,7 +92,7 @@ func NewKV(_ context.Context, config *memberlist.Config, addrs ...string) (KV, e
 }
 
 func (g *gossip) Get(ctx context.Context, key string) ([]byte, error) {
-	logrus.WithField("key", key).Tracef("gossip.Get")
+	logger.C(ctx).WithField("key", key).Tracef("gossip.Get")
 	b, ok, err := g.delegate.get(ctx, key)
 	if err != nil {
 		return nil, err
@@ -94,12 +104,12 @@ func (g *gossip) Get(ctx context.Context, key string) ([]byte, error) {
 }
 
 func (g *gossip) Set(ctx context.Context, key string, value []byte) error {
-	logrus.WithField("key", key).Tracef("gossip.Set")
+	logger.C(ctx).WithField("key", key).Tracef("gossip.Set")
 	return g.delegate.set(ctx, key, value)
 }
 
 func (g *gossip) Delete(ctx context.Context, key string) error {
-	logrus.WithField("key", key).Tracef("gossip.Delete")
+	logger.C(ctx).WithField("key", key).Tracef("gossip.Delete")
 	return g.delegate.delete(ctx, key)
 }
 

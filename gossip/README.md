@@ -42,7 +42,7 @@ func main() {
 	)
 
 	flag.IntVar(&port, "port", 18888, "port")
-	flag.StringVar(&addrs, "addrs", "localhost:18887,localhost:18888,localhost:18889", "memberlist addresses")
+	flag.StringVar(&addrs, "addrs", "dnssrv+_gossip._udp.test.linka-cloud.dev", "memberlist addresses")
 	flag.StringVar(&lvl, "log", "info", "log level")
 	klog.InitFlags(flag.CommandLine)
 	flag.Parse()
@@ -74,12 +74,12 @@ func main() {
 	c.GossipVerifyOutgoing = true
 	c.DisableTcpPings = true
 	c.GossipInterval = tick
-	l, err := gossip.New(ctx, c, lockName, name, strings.Split(addrs, ",")...)
+	l, err := gossip.New(ctx, c, lockName, name, nil, strings.Split(addrs, ",")...)
 	if err != nil {
 		logrus.Fatal(err)
 	}
 	defer l.Close()
-	
+
 	config := le.Config{
 		Name:            lockName,
 		Lock:            l,
@@ -103,7 +103,7 @@ func main() {
 	if err != nil {
 		logrus.Fatal(err)
 	}
-	
+
 	e.Run(ctx)
 }
 

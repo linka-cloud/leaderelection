@@ -293,6 +293,7 @@ func (le *LeaderElector) release() bool {
 	}
 	now := le.clock.Now()
 	leaderElectionRecord := Record{
+		HolderIdentity:            le.observedRecord.HolderIdentity,
 		LeaderTransitions:         le.observedRecord.LeaderTransitions,
 		LeaseDurationMilliSeconds: 1,
 		RenewTime:                 now.UnixMilli(),
