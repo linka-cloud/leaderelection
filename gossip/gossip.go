@@ -28,9 +28,11 @@ import (
 	"go.linka.cloud/leaderelection/gossip/internal/dns"
 )
 
-type GossipLock interface {
+type Lock interface {
 	io.Closer
 	le.Lock
+
+	Memberlist() *memberlist.Memberlist
 }
 
 type gossipLock struct {
@@ -38,11 +40,15 @@ type gossipLock struct {
 	kv KV
 }
 
+func (l *gossipLock) Memberlist() *memberlist.Memberlist {
+	return l.kv.(*gossip).list
+}
+
 func (l *gossipLock) Close() error {
 	return l.kv.Close()
 }
 
-func New(ctx context.Context, config *memberlist.Config, lockName, id string, meta []byte, addrs ...string) (GossipLock, error) {
+func New(ctx context.Context, config *memberlist.Config, lockName, id string, meta []byte, addrs ...string) (Lock, error) {
 	kv, err := NewKV(ctx, config, meta, addrs...)
 	if err != nil {
 		return nil, err

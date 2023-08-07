@@ -125,6 +125,10 @@ func (l *lock) set(ctx context.Context, ler le.Record) error {
 	if err != nil {
 		return fmt.Errorf("failed to get worktree: %w", err)
 	}
+	h, err := l.repo.Head()
+	if err != nil {
+		return fmt.Errorf("failed to get head: %w", err)
+	}
 	f, err := w.Filesystem.Create(l.name)
 	if err != nil {
 		return fmt.Errorf("failed to create file: %w", err)
@@ -151,7 +155,10 @@ func (l *lock) set(ctx context.Context, ler le.Record) error {
 		return fmt.Errorf("failed to commit: %w", err)
 	}
 	if err := l.repo.PushContext(ctx, &git.PushOptions{Auth: l.auth}); err != nil {
-		return errors.Join(fmt.Errorf("failed to push: %w", err), w.Reset(&git.ResetOptions{}))
+		if err := w.Checkout(&git.CheckoutOptions{Hash: h.Hash()}); err != nil {
+			return fmt.Errorf("failed to checkout: %w", err)
+		}
+		return fmt.Errorf("failed to push: %w", err)
 	}
 	return nil
 }

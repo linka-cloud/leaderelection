@@ -78,7 +78,7 @@ func (d *delegate) NotifyMsg(b []byte) {
 		delete(d.kv, a.key)
 	}
 	// queue broadcast to be sent to other nodes
-	d.queue.QueueBroadcast(&broadcast{payload: b})
+	d.queue.QueueBroadcast(&broadcast{payload: b, action: a})
 }
 
 func (d *delegate) GetBroadcasts(overhead, limit int) [][]byte {
@@ -165,8 +165,9 @@ func (d *delegate) set(ctx context.Context, key string, value []byte) error {
 	k := &kv{key: key, value: value, confirmed: make(chan struct{}), time: time.Now().Truncate(time.Millisecond)}
 	d.kv[key] = k
 	d.kmu.Unlock()
-	b := (&action{typ: actionTypeSet, key: key, value: value, time: k.time}).Encode()
-	d.queue.QueueBroadcast(&broadcast{payload: b})
+	a := &action{typ: actionTypeSet, key: key, value: value, time: k.time}
+	b := a.Encode()
+	d.queue.QueueBroadcast(&broadcast{payload: b, action: a})
 	if d.queue.NumNodes() == 1 {
 		maybeClose(k.confirmed)
 		log.Debugf("single node: confirmed")
@@ -195,8 +196,9 @@ func (d *delegate) delete(_ context.Context, key string) error {
 	}
 	delete(d.kv, key)
 	d.kmu.Unlock()
-	b := (&action{typ: actionTypeDelete, key: key, time: time.Now().Truncate(time.Millisecond)}).Encode()
-	d.queue.QueueBroadcast(&broadcast{payload: b})
+	a := &action{typ: actionTypeDelete, key: key, time: time.Now().Truncate(time.Millisecond)}
+	b := a.Encode()
+	d.queue.QueueBroadcast(&broadcast{payload: b, action: a})
 	return nil
 }
 

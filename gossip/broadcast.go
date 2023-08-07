@@ -22,9 +22,13 @@ var _ memberlist.Broadcast = (*broadcast)(nil)
 
 type broadcast struct {
 	payload []byte
+	action  *action
 }
 
 func (b *broadcast) Invalidates(o memberlist.Broadcast) bool {
+	if ob, ok := o.(*broadcast); ok {
+		return b.action.key == ob.action.key && b.action.typ == ob.action.typ
+	}
 	return false
 }
 
