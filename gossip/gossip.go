@@ -33,15 +33,25 @@ type Lock interface {
 	le.Lock
 
 	Memberlist() *memberlist.Memberlist
+	UpdateMeta(ctx context.Context, meta []byte) error
 }
 
 type gossipLock struct {
 	*lock
-	kv KV
+	kv *kvstore
+}
+
+func (l *gossipLock) UpdateMeta(ctx context.Context, meta []byte) error {
+	l.kv.delegate.setMeta(meta)
+	var t time.Duration
+	if d, ok := ctx.Deadline(); ok {
+		t = time.Until(d)
+	}
+	return l.kv.list.UpdateNode(t)
 }
 
 func (l *gossipLock) Memberlist() *memberlist.Memberlist {
-	return l.kv.(*gossip).list
+	return l.kv.list
 }
 
 func (l *gossipLock) Close() error {
@@ -49,7 +59,7 @@ func (l *gossipLock) Close() error {
 }
 
 func New(ctx context.Context, config *memberlist.Config, lockName, id string, meta []byte, addrs ...string) (Lock, error) {
-	kv, err := NewKV(ctx, config, meta, addrs...)
+	kv, err := newKVStore(ctx, config, meta, addrs...)
 	if err != nil {
 		return nil, err
 	}
@@ -57,12 +67,16 @@ func New(ctx context.Context, config *memberlist.Config, lockName, id string, me
 	return &gossipLock{kv: kv, lock: lock}, nil
 }
 
-type gossip struct {
+type kvstore struct {
 	delegate *delegate
 	list     *memberlist.Memberlist
 }
 
-func NewKV(ctx context.Context, config *memberlist.Config, meta []byte, addrs ...string) (KV, error) {
+func NewKVStore(ctx context.Context, config *memberlist.Config, meta []byte, addrs ...string) (KV, error) {
+	return newKVStore(ctx, config, meta, addrs...)
+}
+
+func newKVStore(ctx context.Context, config *memberlist.Config, meta []byte, addrs ...string) (*kvstore, error) {
 	if config.Logger == nil {
 		config.Logger = newLogger(ctx)
 	}
@@ -91,13 +105,13 @@ func NewKV(ctx context.Context, config *memberlist.Config, meta []byte, addrs ..
 	if d.queue.RetransmitMult < n {
 		d.queue.RetransmitMult = n
 	}
-	return &gossip{
+	return &kvstore{
 		delegate: d,
 		list:     list,
 	}, nil
 }
 
-func (g *gossip) Get(ctx context.Context, key string) ([]byte, error) {
+func (g *kvstore) Get(ctx context.Context, key string) ([]byte, error) {
 	logger.C(ctx).WithField("key", key).Tracef("gossip.Get")
 	b, ok, err := g.delegate.get(ctx, key)
 	if err != nil {
@@ -109,16 +123,16 @@ func (g *gossip) Get(ctx context.Context, key string) ([]byte, error) {
 	return b, nil
 }
 
-func (g *gossip) Set(ctx context.Context, key string, value []byte) error {
+func (g *kvstore) Set(ctx context.Context, key string, value []byte) error {
 	logger.C(ctx).WithField("key", key).Tracef("gossip.Set")
 	return g.delegate.set(ctx, key, value)
 }
 
-func (g *gossip) Delete(ctx context.Context, key string) error {
+func (g *kvstore) Delete(ctx context.Context, key string) error {
 	logger.C(ctx).WithField("key", key).Tracef("gossip.Delete")
 	return g.delegate.delete(ctx, key)
 }
 
-func (g *gossip) Close() error {
+func (g *kvstore) Close() error {
 	return multierr.Combine(g.list.Leave(time.Second), g.list.Shutdown())
 }

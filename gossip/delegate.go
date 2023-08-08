@@ -31,6 +31,9 @@ type delegate struct {
 	kmu   sync.RWMutex
 	kv    map[string]*kv
 	log   logger.Logger
+
+	mmu  sync.RWMutex
+	meta []byte
 }
 
 func newDelegate(ctx context.Context, queue *memberlist.TransmitLimitedQueue) *delegate {
@@ -41,8 +44,19 @@ func newDelegate(ctx context.Context, queue *memberlist.TransmitLimitedQueue) *d
 	}
 }
 
-func (d *delegate) NodeMeta(_ int) []byte {
-	return nil
+func (d *delegate) setMeta(meta []byte) {
+	d.mmu.Lock()
+	defer d.mmu.Unlock()
+	d.meta = meta
+}
+
+func (d *delegate) NodeMeta(s int) []byte {
+	d.mmu.RLock()
+	defer d.mmu.RUnlock()
+	if s <= len(d.meta) {
+		return d.meta[:s]
+	}
+	return d.meta
 }
 
 func (d *delegate) NotifyMsg(b []byte) {
